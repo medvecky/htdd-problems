@@ -22,6 +22,7 @@
 (define INVADE-RATE 100)
 
 (define BACKGROUND (empty-scene WIDTH HEIGHT))
+(define EMPTY-FRAME (rectangle WIDTH HEIGHT "outline" "black"))
 
 (define INVADER
   (overlay/xy (ellipse 10 15 "outline" "blue")              ;cockpit cover
@@ -170,6 +171,10 @@
 (check-expect (update-game (make-game empty empty (make-tank 100 0))) (make-game empty empty (make-tank 100 0)))
 (check-expect (update-game (make-game empty empty (make-tank 100 1))) (make-game empty empty (make-tank 102 1)))
 (check-expect (update-game (make-game empty empty (make-tank 100 -1))) (make-game empty empty (make-tank 98 -1)))
+(check-expect (update-game (make-game empty (list (make-missile 100 100)) (make-tank 100 -1)))
+              (make-game empty (list (make-missile 100 90)) (make-tank 98 -1)))
+(check-expect (update-game (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 -1)))
+              (make-game empty (list (make-missile 100 90) (make-missile 150 140)) (make-tank 98 -1)))
 ;(define (update-game game) game) ; stub
 ; <use template for game>
 #;
@@ -178,12 +183,23 @@
        (fn-for-lom (game-missiles s))))
 
 (define (update-game g)
-  (make-game (game-invaders g) (game-missiles g) (next-tank (game-tank g))))
+  (make-game (game-invaders g) (update-lom (game-missiles g)) (next-tank (game-tank g))))
 
 
 ;; Game -> Image
 ;; render the game elements 
-(check-expect (render (make-game empty empty (make-tank 100 0))) (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND))
+(check-expect (render (make-game empty empty (make-tank 100 0)))
+              (overlay EMPTY-FRAME
+                       (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
+(check-expect (render (make-game empty (list (make-missile 100 100)) (make-tank 100 0)))
+              (overlay
+               (place-image MISSILE 100 100 EMPTY-FRAME)
+               (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
+(check-expect (render (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 0)))
+              (overlay
+               (place-image MISSILE 100 100 (place-image MISSILE 150 150 EMPTY-FRAME))
+               (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
+
 ;(define (render g) BACKGROUND) ; stub
 ; <use template for game>
 #;
@@ -193,7 +209,9 @@
        (fn-for-tank (game-tank s))))
 
 (define (render g)
-   (render-tank (game-tank g)))
+   (overlay
+    (render-lom (game-missiles g))
+    (render-tank (game-tank g))))
 
 
 
@@ -251,6 +269,7 @@
 ;; Handle arrows key press
 (check-expect (handle-key (make-game empty empty (make-tank 100 0)) "left") (make-game empty empty (make-tank 100 -1)))
 (check-expect (handle-key (make-game empty empty (make-tank 100 0)) "right") (make-game empty empty (make-tank 100 1)))
+(check-expect (handle-key (make-game empty empty (make-tank 100 1)) " ") (make-game empty (list (make-missile 100 (- HEIGHT (image-height TANK)))) (make-tank 100 1)))
 ;(define (handle-key game ke) game) ; stub
 ; <use template for game>
 #;
@@ -265,10 +284,14 @@
      (make-game (game-invaders game) (game-missiles game) (make-tank (tank-x (game-tank game)) 1))]
      [(key=? ke "left" )
      (make-game (game-invaders game) (game-missiles game) (make-tank (tank-x (game-tank game)) -1))]
+      [(key=? ke " ")
+      (make-game (game-invaders game)
+                 (cons (make-missile (tank-x (game-tank game)) (- HEIGHT (image-height TANK))) (game-missiles game))
+                 (game-tank game))] 
      [else game]))
 
 ;; Game -> Game
-;; Handle arrows key release
+;; Handle arrows key release 
 (check-expect (handle-release (make-game empty empty (make-tank 100 -1)) "left") (make-game empty empty (make-tank 100  0)))
 (check-expect (handle-release (make-game empty empty (make-tank 100 1)) "right") (make-game empty empty (make-tank 100 0)))
 ;(define (handle-release game ke) game) ; stub
@@ -287,4 +310,53 @@
      (make-game (game-invaders game) (game-missiles game) (make-tank (tank-x (game-tank game)) 0))]
      [else game]))
 
- 
+;; Missile -> Missile
+;; produce next missile state
+(check-expect (next-missile (make-missile 100 150)) (make-missile 100 140))
+;(define (next-missile m) m) ; stub
+; <use template for missile>
+#;
+(define (fn-for-missile m)
+  (... (missile-x m) (missile-y m)))
+(define (next-missile m)
+  (make-missile (missile-x m) (- (missile-y m) MISSILE-SPEED)))
+
+;; ListOfMissiles -> ListOfMissiles
+;; update all missile in list one  by one
+(check-expect (update-lom empty) empty)
+(check-expect (update-lom (list (make-missile 100 100))) (list (make-missile 100 90)))
+(check-expect (update-lom (list (make-missile 100 100) (make-missile 150 150))) (list (make-missile 100 90) (make-missile 150 140)))
+;(define (update-lom lom) lom) ; stub
+;<use template for ListOfMissiles>
+#;
+(define (fn-for-lom lom)
+  (cond [(empty? lom) (...)]
+        [else
+         (... (fn-for-missile (first lom))
+              (fn-for-lom (rest lom)))]))
+
+(define (update-lom lom)
+  (cond [(empty? lom) empty]
+        [else
+         (cons (next-missile (first lom))
+              (update-lom (rest lom)))]))
+
+;; ListOfMissiles -> Image
+;; render list of missiles
+(check-expect (render-lom empty) EMPTY-FRAME)
+(check-expect (render-lom (list (make-missile 100 100))) (place-image MISSILE 100 100 EMPTY-FRAME))
+(check-expect (render-lom (list (make-missile 100 100) (make-missile 150 150))) (place-image MISSILE 100 100 (place-image MISSILE 150 150 EMPTY-FRAME)))
+;(define (render-lom lom) empty-image) ;stub
+;<use template for ListOfMissiles>
+#;
+(define (fn-for-lom lom)
+  (cond [(empty? lom) (...)]
+        [else
+         (... (fn-for-missile (first lom))
+              (fn-for-lom (rest lom)))]))
+
+(define (render-lom lom)
+  (cond [(empty? lom) EMPTY-FRAME]
+        [else
+         (place-image MISSILE (missile-x (first lom)) (missile-y (first lom))
+              (render-lom (rest lom)))]))
