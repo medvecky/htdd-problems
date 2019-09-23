@@ -156,7 +156,7 @@
 ;; Functions:
 
 ;; Game -> Game
-;; start the world with (main game) - with defined lists
+;; start the world with (main (make-game empty empty (make-tank 150 0)))
 ;; 
 (define (main game)
   (big-bang game                          ; game
@@ -183,22 +183,19 @@
        (fn-for-lom (game-missiles s))))
 
 (define (update-game g)
-  (make-game (game-invaders g) (update-lom (game-missiles g)) (next-tank (game-tank g))))
+  (make-game (game-invaders g) (remove-flew-out-missiles (update-lom (game-missiles g))) (next-tank (game-tank g))))
 
 
 ;; Game -> Image
 ;; render the game elements 
 (check-expect (render (make-game empty empty (make-tank 100 0)))
-              (overlay EMPTY-FRAME
-                       (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
+                       (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND))
 (check-expect (render (make-game empty (list (make-missile 100 100)) (make-tank 100 0)))
-              (overlay
-               (place-image MISSILE 100 100 EMPTY-FRAME)
-               (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
+               (place-image MISSILE 100 100 
+                            (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
 (check-expect (render (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 0)))
-              (overlay
-               (place-image MISSILE 100 100 (place-image MISSILE 150 150 EMPTY-FRAME))
-               (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND)))
+               (place-image MISSILE 100 100 (place-image MISSILE 150 150
+                                                         (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND))))
 
 ;(define (render g) BACKGROUND) ; stub
 ; <use template for game>
@@ -209,9 +206,8 @@
        (fn-for-tank (game-tank s))))
 
 (define (render g)
-   (overlay
-    (render-lom (game-missiles g))
-    (render-tank (game-tank g))))
+    (render-lom (game-missiles g) (render-tank (game-tank g))))
+ 
 
 
 
@@ -343,10 +339,10 @@
 
 ;; ListOfMissiles -> Image
 ;; render list of missiles
-(check-expect (render-lom empty) EMPTY-FRAME)
-(check-expect (render-lom (list (make-missile 100 100))) (place-image MISSILE 100 100 EMPTY-FRAME))
-(check-expect (render-lom (list (make-missile 100 100) (make-missile 150 150))) (place-image MISSILE 100 100 (place-image MISSILE 150 150 EMPTY-FRAME)))
-;(define (render-lom lom) empty-image) ;stub
+(check-expect (render-lom empty  BACKGROUND) BACKGROUND)
+(check-expect (render-lom (list (make-missile 100 100)) BACKGROUND) (place-image MISSILE 100 100 BACKGROUND))
+(check-expect (render-lom (list (make-missile 100 100) (make-missile 150 150)) BACKGROUND) (place-image MISSILE 100 100 (place-image MISSILE 150 150 BACKGROUND)))
+;(define (render-lom lom img) BACKGROUN) ;stub
 ;<use template for ListOfMissiles>
 #;
 (define (fn-for-lom lom)
@@ -355,8 +351,49 @@
          (... (fn-for-missile (first lom))
               (fn-for-lom (rest lom)))]))
 
-(define (render-lom lom)
-  (cond [(empty? lom) EMPTY-FRAME]
+(define (render-lom lom img)
+  (cond [(empty? lom) img]
         [else
          (place-image MISSILE (missile-x (first lom)) (missile-y (first lom))
-              (render-lom (rest lom)))]))
+              (render-lom (rest lom) img))]))
+
+;; ListOfMissiles -> ListOfMissiles
+;; removes flew out missiles from list
+(check-expect (remove-flew-out-missiles empty) empty)
+(check-expect (remove-flew-out-missiles (list (make-missile 100 100))) (list (make-missile 100 100)))
+(check-expect (remove-flew-out-missiles (list (make-missile 100 -1))) empty)
+(check-expect (remove-flew-out-missiles (list (make-missile 100 100) (make-missile 150 150))) (list (make-missile 100 100) (make-missile 150 150)))
+(check-expect (remove-flew-out-missiles (list (make-missile 100 -1) (make-missile 150 150))) (list (make-missile 150 150)))
+(check-expect (remove-flew-out-missiles (list (make-missile 100 100) (make-missile 150 -1))) (list (make-missile 100 100)))
+(check-expect (remove-flew-out-missiles (list (make-missile 100 -1) (make-missile 150 -1))) empty)
+; (define (remove-flew-out-missiles lom) lom) ;stub
+
+; <use template for ListOfMissiles>
+#;
+(define (fn-for-lom lom)
+  (cond [(empty? lom) (...)]
+        [else
+         (... (fn-for-missile (first lom))
+              (fn-for-lom (rest lom)))]))
+
+(define (remove-flew-out-missiles lom)
+  (cond [(empty? lom) empty]
+        [else
+         (if (missile-flew-out? (first lom))
+             (remove-flew-out-missiles (rest lom))
+             (cons (first lom) (remove-flew-out-missiles (rest lom))))]))
+
+
+;; Missile -> Boolean
+;; produce true if missile flew out of the game field
+(check-expect (missile-flew-out? (make-missile 100 150)) false)
+(check-expect (missile-flew-out? (make-missile 100 0)) false)
+(check-expect (missile-flew-out? (make-missile 100 -1)) true)
+; (define (missile-flew-out? m) false) ; stub
+; <use template for Missile>
+#;
+(define (fn-for-missile m)
+  (... (missile-x m) (missile-y m)))
+
+(define (missile-flew-out? m)
+  (< (missile-y m) 0))
