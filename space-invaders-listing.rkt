@@ -168,13 +168,13 @@
 
 ;; Game -> Game
 ;; produce the next game state
-(check-expect (update-game (make-game empty empty (make-tank 100 0))) (make-game empty empty (make-tank 100 0)))
-(check-expect (update-game (make-game empty empty (make-tank 100 1))) (make-game empty empty (make-tank 102 1)))
-(check-expect (update-game (make-game empty empty (make-tank 100 -1))) (make-game empty empty (make-tank 98 -1)))
-(check-expect (update-game (make-game empty (list (make-missile 100 100)) (make-tank 100 -1)))
-              (make-game empty (list (make-missile 100 90)) (make-tank 98 -1)))
-(check-expect (update-game (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 -1)))
-              (make-game empty (list (make-missile 100 90) (make-missile 150 140)) (make-tank 98 -1)))
+;(check-expect (update-game (make-game empty empty (make-tank 100 0))) (make-game empty empty (make-tank 100 0)))
+;(check-expect (update-game (make-game empty empty (make-tank 100 1))) (make-game empty empty (make-tank 102 1)))
+;(check-expect (update-game (make-game empty empty (make-tank 100 -1))) (make-game empty empty (make-tank 98 -1)))
+;(check-expect (update-game (make-game empty (list (make-missile 100 100)) (make-tank 100 -1)))
+;              (make-game empty (list (make-missile 100 90)) (make-tank 98 -1)))
+;(check-expect (update-game (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 -1)))
+;              (make-game empty (list (make-missile 100 90) (make-missile 150 140)) (make-tank 98 -1)))
 ;(define (update-game game) game) ; stub
 ; <use template for game>
 #;
@@ -183,8 +183,23 @@
        (fn-for-lom (game-missiles s))))
 
 (define (update-game g)
-  (make-game (game-invaders g) (remove-flew-out-missiles (update-lom (game-missiles g))) (next-tank (game-tank g))))
+  (new-invader (remove-flew-out-missiles-from-game (update-all-game-elements-position g))))
 
+
+;; Game -> Game
+;; produce new game with new positions of all elements
+(check-expect (update-all-game-elements-position (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 -1)))
+              (make-game empty (list (make-missile 100 90) (make-missile 150 140)) (make-tank 98 -1)))
+; (define (update-all-game-elements-position g) g) ;stub
+; <use template for game>
+#;
+(define (fn-for-game s)
+  (... (fn-for-loinvader (game-invaders s))
+       (fn-for-lom (game-missiles s))
+       (fn-for-tank (game-tank s))))
+
+(define (update-all-game-elements-position g)
+  (make-game (game-invaders g) (update-lom (game-missiles g)) (next-tank (game-tank g))))
 
 ;; Game -> Image
 ;; render the game elements 
@@ -357,6 +372,28 @@
          (place-image MISSILE (missile-x (first lom)) (missile-y (first lom))
               (render-lom (rest lom) img))]))
 
+;;Game -> Game
+;; produce game without flew out missile
+(check-expect (remove-flew-out-missiles-from-game (make-game empty
+                                                             (list (make-missile 100 100) (make-missile 150 -1))
+                                                             (make-tank 150 0)))
+              (make-game empty
+                         (list (make-missile 100 100))
+                         (make-tank 150 0)))
+              
+; (define (remove-flew-out-missiles-from-game g) g) ; stub
+; <use template for Game>
+#;
+(define (fn-for-game s)
+  (... (fn-for-loinvader (game-invaders s))
+       (fn-for-lom (game-missiles s))
+       (fn-for-tank (game-tank s))))
+
+(define (remove-flew-out-missiles-from-game g)
+  (make-game (game-invaders g)
+             (remove-flew-out-missiles (game-missiles g))
+             (game-tank g)))
+
 ;; ListOfMissiles -> ListOfMissiles
 ;; removes flew out missiles from list
 (check-expect (remove-flew-out-missiles empty) empty)
@@ -397,3 +434,60 @@
 
 (define (missile-flew-out? m)
   (< (missile-y m) 0))
+
+
+;;Game -> Game
+;; add invader to game's invaders list
+
+(define (new-invader g)
+  (if (< (random 150) INVADE-RATE)
+      (make-game (cons (make-invader (random WIDTH) 0 (get-direction 2)) (game-invaders g)) (game-missiles g) (game-tank g))
+      g))
+
+;; Invader -> Invader 
+;; Update innvader x and y position
+(check-expect (next-invader (make-invader 150 150 1)) (make-invader 151.5 151.5 1))
+(check-expect (next-invader (make-invader 150 150 -1)) (make-invader 148.5 148.5 -1))
+(check-expect (next-invader (make-invader 1 150 -1)) (make-invader -0.5 148.5 1))
+(check-expect (next-invader (make-invader WIDTH 150 1)) (make-invader (+ WIDTH 1.5) 151.5 -1))
+;(define (next-invader i) i) ; stub
+; <use template for invader>
+#;
+(define (fn-for-invader invader)
+  (... (invader-x invader) (invader-y invader) (invader-dx invader)))
+
+(define (next-invader i)
+  (check-invader-position (make-invader
+                           (+ (* (invader-dx i) INVADER-X-SPEED) (invader-x i))
+                           (+ (* (invader-dx i) INVADER-Y-SPEED) (invader-y i))
+                           (invader-dx i))))
+
+;; Invader -> Invader
+;; check invader direction and change it if invader reach field side
+(check-expect (check-invader-position (make-invader 100 100 1)) (make-invader 100 100 1))
+(check-expect (check-invader-position (make-invader 0 100 -1)) (make-invader 0 100 1))
+(check-expect (check-invader-position (make-invader -1 100 -1)) (make-invader -1 100 1))
+(check-expect (check-invader-position (make-invader WIDTH 100 1)) (make-invader WIDTH 100 -1))
+(check-expect (check-invader-position (make-invader (+ WIDTH 1) 100 1)) (make-invader (+ WIDTH 1) 100 -1))
+; (define (check-invader-position i) i) ; stub
+; <use template for invader>
+#;
+(define (fn-for-invader invader)
+  (... (invader-x invader) (invader-y invader) (invader-dx invader)))
+
+(define (check-invader-position i)
+  (cond [(<= (invader-x i) 0)
+         (make-invader (invader-x i) (invader-y i) 1)]
+        [(>= (invader-x i) WIDTH)
+         (make-invader (invader-x i) (invader-y i) -1)]
+        [else i]))
+
+;; Integer -> Integer
+;; produce random 1 or -1 for invader direction
+(check-range  (get-direction 2) -1 1)
+;(define (get-direction x) -2) ; stub
+(define (get-direction x)
+  (if (= (random x) 1)
+      1
+      -1))
+
