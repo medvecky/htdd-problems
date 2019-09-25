@@ -199,7 +199,7 @@
        (fn-for-tank (game-tank s))))
 
 (define (update-all-game-elements-position g)
-  (make-game (game-invaders g) (update-lom (game-missiles g)) (next-tank (game-tank g))))
+  (make-game (update-loi (game-invaders g)) (update-lom (game-missiles g)) (next-tank (game-tank g))))
 
 ;; Game -> Image
 ;; render the game elements 
@@ -211,6 +211,15 @@
 (check-expect (render (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 0)))
                (place-image MISSILE 100 100 (place-image MISSILE 150 150
                                                          (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND))))
+(check-expect (render (make-game
+                       (list (make-invader 100 100 1) (make-invader 150 150 1))
+                       (list (make-missile 100 100) (make-missile 150 150))
+                       (make-tank 100 0)))
+              (place-image INVADER 100 100 
+                           (place-image INVADER 150 150 
+                                         (place-image MISSILE 100 100
+                                                      (place-image MISSILE 150 150
+                                                                   (place-image TANK 100 (- HEIGHT TANK-HEIGHT/2) BACKGROUND))))))
 
 ;(define (render g) BACKGROUND) ; stub
 ; <use template for game>
@@ -221,7 +230,7 @@
        (fn-for-tank (game-tank s))))
 
 (define (render g)
-    (render-lom (game-missiles g) (render-tank (game-tank g))))
+    (render-loi (game-invaders g) (render-lom (game-missiles g) (render-tank (game-tank g)))))
  
 
 
@@ -372,6 +381,35 @@
          (place-image MISSILE (missile-x (first lom)) (missile-y (first lom))
               (render-lom (rest lom) img))]))
 
+;; ListOfInvaders -> Image
+;; render list of invaders
+(check-expect (render-loi empty BACKGROUND) BACKGROUND)
+(check-expect (render-loi (list (make-invader 150 150 1)) BACKGROUND) (place-image INVADER 150 150 BACKGROUND))
+(check-expect (render-loi (list (make-invader 150 150 1) (make-invader 100 100 1)) BACKGROUND) (place-image
+                                                                                                INVADER 150 150
+                                                                                                (place-image
+                                                                                                 INVADER 100 100 BACKGROUND)))
+; (define (render-loi loi image) BACKGROUND) ; stub
+; <use template for ListOfInvaders>
+; use template for ListOfInvaders
+#;
+(define (fn-for-loi loi)
+  (cond [(empty? loi) (...)]
+        [else
+         (... (fn-for-invader (first loi))
+              (fn-for-loi (rest loi)))]))
+
+(define (render-loi loi img)
+  (cond [(empty? loi) img]
+        [else
+         (place-image
+          INVADER
+          (invader-x (first loi))
+          (invader-y (first loi))
+          (render-loi (rest loi) img))]))
+                      
+
+
 ;;Game -> Game
 ;; produce game without flew out missile
 (check-expect (remove-flew-out-missiles-from-game (make-game empty
@@ -435,20 +473,41 @@
 (define (missile-flew-out? m)
   (< (missile-y m) 0))
 
+;; ListOfInvaders -> ListOfInvaders
+;; Produce ListOfInvaders with updated X and Y positions
+
+(check-expect (update-loi empty) empty)
+(check-expect (update-loi (list (make-invader 150 150 1))) (list (make-invader 151.5 151.5 1)))
+(check-expect (update-loi (list (make-invader 150 150 1) (make-invader 0 150 -1))) (list (make-invader 151.5 151.5 1) (make-invader -1.5 151.5 1)))
+; (define (update-loi loi) loi) ; stub
+; use template for ListOfInvaders
+#;
+(define (fn-for-loi loi)
+  (cond [(empty? loi) (...)]
+        [else
+         (... (fn-for-invader (first loi))
+              (fn-for-loi (rest loi)))]))
+
+(define (update-loi loi)
+  (cond [(empty? loi) empty]
+        [else
+         (cons (next-invader (first loi))
+              (update-loi (rest loi)))]))
+
 
 ;;Game -> Game
 ;; add invader to game's invaders list
 
 (define (new-invader g)
-  (if (< (random 150) INVADE-RATE)
+  (if (< (random 10000) INVADE-RATE)
       (make-game (cons (make-invader (random WIDTH) 0 (get-direction 2)) (game-invaders g)) (game-missiles g) (game-tank g))
       g))
 
 ;; Invader -> Invader 
 ;; Update innvader x and y position
 (check-expect (next-invader (make-invader 150 150 1)) (make-invader 151.5 151.5 1))
-(check-expect (next-invader (make-invader 150 150 -1)) (make-invader 148.5 148.5 -1))
-(check-expect (next-invader (make-invader 1 150 -1)) (make-invader -0.5 148.5 1))
+(check-expect (next-invader (make-invader 150 150 -1)) (make-invader 148.5 151.5 -1))
+(check-expect (next-invader (make-invader 1 150 -1)) (make-invader -0.5 151.5 1))
 (check-expect (next-invader (make-invader WIDTH 150 1)) (make-invader (+ WIDTH 1.5) 151.5 -1))
 ;(define (next-invader i) i) ; stub
 ; <use template for invader>
@@ -459,7 +518,7 @@
 (define (next-invader i)
   (check-invader-position (make-invader
                            (+ (* (invader-dx i) INVADER-X-SPEED) (invader-x i))
-                           (+ (* (invader-dx i) INVADER-Y-SPEED) (invader-y i))
+                           (+ INVADER-Y-SPEED (invader-y i))
                            (invader-dx i))))
 
 ;; Invader -> Invader
