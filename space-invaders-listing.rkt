@@ -19,7 +19,7 @@
 
 (define HIT-RANGE 10)
 
-(define INVADE-RATE 100)
+(define INVADE-RATE 200)
 
 (define BACKGROUND (empty-scene WIDTH HEIGHT))
 (define EMPTY-FRAME (rectangle WIDTH HEIGHT "outline" "black"))
@@ -162,20 +162,12 @@
   (big-bang game                          ; game
             (on-tick   update-game)       ; Game -> Game
             (to-draw   render)            ; Game -> Image
-            ;(stop-when ...)              ; Game -> Boolean
+            (stop-when game-end?)         ; Game -> Boolean
             (on-key handle-key)           ; GameKeyEvent -> Game
             (on-release handle-release))) ; GameKeyEvent -> Game
 
 ;; Game -> Game
 ;; produce the next game state
-;(check-expect (update-game (make-game empty empty (make-tank 100 0))) (make-game empty empty (make-tank 100 0)))
-;(check-expect (update-game (make-game empty empty (make-tank 100 1))) (make-game empty empty (make-tank 102 1)))
-;(check-expect (update-game (make-game empty empty (make-tank 100 -1))) (make-game empty empty (make-tank 98 -1)))
-;(check-expect (update-game (make-game empty (list (make-missile 100 100)) (make-tank 100 -1)))
-;              (make-game empty (list (make-missile 100 90)) (make-tank 98 -1)))
-;(check-expect (update-game (make-game empty (list (make-missile 100 100) (make-missile 150 150)) (make-tank 100 -1)))
-;              (make-game empty (list (make-missile 100 90) (make-missile 150 140)) (make-tank 98 -1)))
-;(define (update-game game) game) ; stub
 ; <use template for game>
 #;
 (define (fn-for-game s)
@@ -183,7 +175,48 @@
        (fn-for-lom (game-missiles s))))
 
 (define (update-game g)
-  (new-invader (remove-flew-out-missiles-from-game (update-all-game-elements-position g))))
+  (new-invader (remove-destroyed-items (remove-flew-out-missiles-from-game (update-all-game-elements-position g)))))
+
+
+;;Game -> Game
+;; produce new game without destroyed invaders and missiles
+
+(check-expect (remove-destroyed-items (make-game
+                                       (list (make-invader 100 100 50))
+                                       (list (make-missile 100 100))
+                                       (make-tank 150 0)))
+              (make-game
+               empty
+               empty
+               (make-tank 150 0)))
+
+(check-expect (remove-destroyed-items (make-game
+                                       (list (make-invader 150 150 50))
+                                       (list (make-missile 100 100))
+                                       (make-tank 150 0)))
+              (make-game
+               (list (make-invader 150 150 50))
+               (list (make-missile 100 100))
+               (make-tank 150 0)))
+; (define (remove-destroyed-items g) g) ; stub
+
+;<use template for game>
+#;
+(define (fn-for-game s)
+  (... (fn-for-loinvader (game-invaders s))
+       (fn-for-lom (game-missiles s))
+       (fn-for-tank (game-tank s))))
+
+
+(define (remove-destroyed-items g)
+  (make-game
+   (remove-destroyed-invaders
+    (game-invaders g)
+    (game-missiles g))
+   (remove-destroyed-missiles
+    (game-missiles g)
+    (game-invaders g))
+   (game-tank g)))
 
 
 ;; Game -> Game
@@ -550,3 +583,263 @@
       1
       -1))
 
+;; ListOfMissile ListOfInvaders -> ListOfMissiles
+;; produce ListOfMissiles without destroyed items
+(check-expect (remove-destroyed-missiles empty empty) empty)
+(check-expect (remove-destroyed-missiles empty (list (make-invader 100 100 1) (make-invader 150 150 1))) empty)
+(check-expect (remove-destroyed-missiles (list (make-missile 50 50)) (list (make-invader 100 100 1) (make-invader 150 150 1))) (list (make-missile 50 50)))
+(check-expect (remove-destroyed-missiles (list (make-missile 100 100)) (list (make-invader 100 100 1) (make-invader 150 150 1))) empty)
+(check-expect (remove-destroyed-missiles (list (make-missile 150 150)) (list (make-invader 100 100 1) (make-invader 150 150 1))) empty)
+(check-expect (remove-destroyed-missiles (list
+                                          (make-missile 50 50)
+                                          (make-missile 70 70))
+                                         (list
+                                          (make-invader 100 100 1)
+                                          (make-invader 150 150 1)))
+              (list
+               (make-missile 50 50)
+               (make-missile 70 70)))
+(check-expect (remove-destroyed-missiles (list
+                                          (make-missile 100 100)
+                                          (make-missile 70 70))
+                                         (list
+                                          (make-invader 100 100 1)
+                                          (make-invader 150 150 1)))
+              (list
+               (make-missile 70 70)))
+(check-expect (remove-destroyed-missiles (list
+                                          (make-missile 50 50)
+                                          (make-missile 150 150))
+                                         (list
+                                          (make-invader 100 100 1)
+                                          (make-invader 150 150 1)))
+              (list
+               (make-missile 50 50)))
+(check-expect (remove-destroyed-missiles (list
+                                          (make-missile 100 100)
+                                          (make-missile 150 150))
+                                         (list
+                                          (make-invader 100 100 1)
+                                          (make-invader 150 150 1)))
+              empty)
+
+; (define (remove-destroyed-missiles lom loi) lom) ; stub
+; <use template for ListOfMissiles>
+#;
+(define (fn-for-lom lom)
+  (cond [(empty? lom) (...)]
+        [else
+         (... (fn-for-missile (first lom))
+              (fn-for-lom (rest lom)))]))
+
+(define (remove-destroyed-missiles lom loi)
+  (cond [(empty? lom) empty]
+        [(empty? loi) lom] 
+        [else
+         (if (missile-destroyed? (first lom) loi)
+             (remove-destroyed-missiles (rest lom) loi)
+             (cons (first lom) (remove-destroyed-missiles (rest lom) loi)))]))
+
+;; ListOfInaders ListOfMissiles -> ListOfInvaders
+;; produce LilstOfInvaders without destroyed items
+(check-expect (remove-destroyed-invaders empty empty) empty)
+(check-expect (remove-destroyed-invaders empty (list (make-missile 100 100) (make-missile 150 150))) empty)
+(check-expect (remove-destroyed-invaders (list (make-invader 50 50 1)) (list (make-missile 100 100) (make-missile 150 150))) (list (make-invader 50 50 1)))
+(check-expect (remove-destroyed-invaders (list (make-invader 100 100 1)) (list (make-missile 100 100) (make-missile 150 150))) empty)
+(check-expect (remove-destroyed-invaders (list (make-invader 150 150 1)) (list (make-missile 100 100) (make-missile 150 150))) empty)
+(check-expect (remove-destroyed-invaders (list
+                                          (make-invader 50 50 1)
+                                          (make-invader 70 70 1))
+                                         (list
+                                          (make-missile 100 100)
+                                          (make-missile 150 150)))
+              (list
+               (make-invader 50 50 1)
+               (make-invader 70 70 1)))
+(check-expect (remove-destroyed-invaders (list
+                                          (make-invader 100 100 1)
+                                          (make-invader 70 70 1))
+                                         (list
+                                          (make-missile 100 100)
+                                          (make-missile 150 150)))
+              (list
+               (make-invader 70 70 1)))
+(check-expect (remove-destroyed-invaders (list
+                                          (make-invader 50 50 1)
+                                          (make-invader 150 150 1))
+                                         (list
+                                          (make-missile 100 100)
+                                          (make-missile 150 150)))
+              (list
+               (make-invader 50 50 1)))
+(check-expect (remove-destroyed-invaders (list
+                                          (make-invader 100 100 1)
+                                          (make-invader 150 150 1))
+                                         (list
+                                          (make-missile 100 100)
+                                          (make-missile 150 150)))
+              empty)
+; (define (remove-destroyed-invaders loi lom) loi) ; stub
+; <use template for ListOfInvaders>
+#;
+(define (fn-for-loi loi)
+  (cond [(empty? loi) (...)]
+        [else
+         (... (fn-for-invader (first loi))
+              (fn-for-loi (rest loi)))]))
+
+
+(define (remove-destroyed-invaders loi lom)
+  (cond [(empty? loi) empty]
+        [(empty? lom) loi] 
+        [else
+         (if (invader-destroyed? (first loi) lom)
+             (remove-destroyed-invaders (rest loi) lom)
+             (cons (first loi) (remove-destroyed-invaders (rest loi) lom)))]))
+
+;; Mssile ListOfInvadeders -> Boolean
+;; produce true if missile destroyed by invader explosure
+
+(check-expect (missile-destroyed? (make-missile 100 100) empty) false)
+(check-expect (missile-destroyed? (make-missile 100 100) (list (make-invader 150 150 1))) false)
+(check-expect (missile-destroyed? (make-missile 100 100) (list (make-invader 110 98 1))) true)
+(check-expect (missile-destroyed? (make-missile 100 100)
+                                  (list (make-invader 150 150 1)
+                                        (make-invader 110 98 1))) true)
+(check-expect (missile-destroyed? (make-missile 100 100)
+                                  (list (make-invader 110 98 1)
+                                        (make-invader 150 150 1))) true)
+(check-expect (missile-destroyed? (make-missile 100 100)
+                                  (list (make-invader 110 98 1)
+                                        (make-invader 110 98 1))) true)
+(check-expect (missile-destroyed? (make-missile 100 100)
+                                  (list (make-invader 150 150 1)
+                                        (make-invader 150 150 1))) false)
+
+; (define (missile-destroyed? m loi) true) ; stub
+; <use template for ListOfInvaders>
+#;
+(define (fn-for-loi loi)
+  (cond [(empty? loi) (...)]
+        [else
+         (... (fn-for-invader (first loi))
+              (fn-for-loi (rest loi)))]))
+
+(define (missile-destroyed? m loi)
+  (cond [(empty? loi) false]
+        [else
+         (if (missile-meet-invader? (first loi) m)
+             true
+              (missile-destroyed? m (rest loi)))]))
+
+
+
+
+;; Invader ListOfMissiles -> Boolean
+;; produce true if invader destroyed by any missile from list
+(check-expect (invader-destroyed? (make-invader 100 100 1) empty) false)
+(check-expect (invader-destroyed? (make-invader 100 100 1) (list (make-missile 150 150))) false)
+(check-expect (invader-destroyed? (make-invader 100 100 1) (list (make-missile 110 98))) true)
+(check-expect (invader-destroyed? (make-invader 100 100 1)
+                                  (list (make-missile 150 150)
+                                        (make-missile 110 98))) true)
+(check-expect (invader-destroyed? (make-invader 100 100 1)
+                                  (list (make-missile 110 98)
+                                        (make-missile 150 150))) true)
+(check-expect (invader-destroyed? (make-invader 100 100 1)
+                                  (list (make-missile 110 98)
+                                        (make-missile 110 98))) true)
+(check-expect (invader-destroyed? (make-invader 100 100 1)
+                                  (list (make-missile 150 150)
+                                        (make-missile 150 150))) false)
+; (define (invader-destroyed? i lom) true) ; stub
+; <use template for ListOfMissiles>
+#;
+(define (fn-for-lom lom)
+  (cond [(empty? lom) (...)]
+        [else
+         (... (fn-for-missile (first lom))
+              (fn-for-lom (rest lom)))]))
+
+(define (invader-destroyed? i lom)
+  (cond [(empty? lom) false]
+        [else
+         (if (missile-meet-invader? i (first lom))
+             true
+              (invader-destroyed? i (rest lom)))]))
+
+;; Invader Missile -> Boolean
+;; produce true if missile meets invader
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 150 150)) false)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 110 110)) true)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 111 110)) false)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 110 111)) false)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 109 111)) false)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 109 109)) true)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 110 109)) true)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 109 95)) true)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 95 95)) true)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 80 80)) false)
+(check-expect (missile-meet-invader? (make-invader 100 100 1) (make-missile 100 80)) false)
+; (define (invider-destroyed-by-missile? i m) true) ; stub
+; <use template for invader>
+#;
+(define (fn-for-invader invader)
+  (... (invader-x invader) (invader-y invader) (invader-dx invader)))
+
+(define (missile-meet-invader? i m)
+ (and (<= (abs (- (invader-x i) (missile-x m))) 10)
+      (<= (abs (- (invader-y i) (missile-y m))) 10)))
+
+
+;; Game -> Boolean
+;; produce true if one of invader passed through the game field
+(check-expect (game-end? (make-game (list (make-invader 150 150 1)) empty (make-tank 150 0))) false)
+(check-expect (game-end? (make-game (list (make-invader 150 HEIGHT 1)) empty (make-tank 150 0))) true)
+; (define (game-end? g) true);
+; <use template for Game>
+#;
+(define (fn-for-game s)
+  (... (fn-for-loinvader (game-invaders s))
+       (fn-for-lom (game-missiles s))
+       (fn-for-tank (game-tank s))))
+(define (game-end? g)
+  (invader-passed? (game-invaders g)))
+
+;; ListOfInvaders -> Boolean
+;; produce true if one of invader passed through the game field
+(check-expect (invader-passed? empty) false)
+(check-expect (invader-passed? (list (make-invader 150 150 1))) false)
+(check-expect (invader-passed? (list (make-invader 150 HEIGHT 1))) true)
+(check-expect (invader-passed? (list (make-invader 150 (+ 1 HEIGHT) 1))) true)
+(check-expect (invader-passed? (list
+                                (make-invader 150 150 1)
+                                (make-invader 100 100 1)))
+              false)
+(check-expect (invader-passed? (list
+                                (make-invader 150 HEIGHT 1)
+                                (make-invader 100 100 1)))
+              true)
+(check-expect (invader-passed? (list
+                                (make-invader 150 150 1)
+                                (make-invader 100 HEIGHT 1)))
+              true)
+(check-expect (invader-passed? (list
+                                (make-invader 150 HEIGHT 1)
+                                (make-invader 100 HEIGHT 1)))
+              true)
+; (define (invader-passed? loi) true) ; stub
+; <use template for ListOfInvaders>
+#;
+(define (fn-for-loi loi)
+  (cond [(empty? loi) (...)]
+        [else
+         (... (fn-for-invader (first loi))
+              (fn-for-loi (rest loi)))]))
+
+(define (invader-passed? loi)
+  (cond [(empty? loi) false]
+        [else
+         (if (>= (invader-y (first loi)) HEIGHT)
+             true
+             (invader-passed? (rest loi)))]))
