@@ -42,7 +42,7 @@
 (define CUTOFF 2)
 
 ;; Number -> Image
-;; produce a Sierpinski Triangle of the given size
+;; produce a Sierpinski Triangle of the give size
 (check-expect (stri CUTOFF) (triangle CUTOFF "outline" "red"))
 (check-expect (stri (* CUTOFF 2))
              (overlay (triangle (* CUTOFF 2) "outline" "red")
@@ -58,6 +58,21 @@
         [else
          (... d 
               (genrec-fn (next-problem d)))]))
+
+; 
+; PROBLEM:
+; Three part termination argument
+; 
+; Base case: (<= s CUTOFF)
+; 
+; Reduction step: (/ s 2)
+; 
+; Argument that repeated application of reduction step will eventually 
+; reach the base case:
+; As long as cutoff is > 0 and s starts >= 0 repeated division by 2
+; will eventually be less than cutoff. 
+
+
 
 (define (stri s)
   (cond [(<= s CUTOFF)
@@ -81,7 +96,7 @@
 
 
 ;; Number -> Image
-;; produce a Sierpinski carpet of the given size
+;; produce a Sierpinski carpet of the give size
 (check-expect (scarpet CUTOFF) (square CUTOFF "outline" "red"))
 (check-expect (scarpet (* CUTOFF 3))
               (overlay (square (* 3 CUTOFF) "outline" "red")
@@ -100,6 +115,22 @@
         [else
          (... d 
               (genrec-fn (next-problem d)))]))
+
+
+; 
+; PROBLEM:
+; Three part termination argument
+; 
+; Base case: (<= s CUTOFF)
+; 
+; Reduction step: (/ s 3)
+; 
+; Argument that repeated application of reduction step will eventually 
+; reach the base case:
+; As long as cutoff is > 0 and s starts >= 0 repeated division by 3
+; will eventually be less than cutoff. 
+
+
 
 (define (scarpet s)
   (cond [(<= s CUTOFF)
