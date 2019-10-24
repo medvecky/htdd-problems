@@ -3,7 +3,7 @@
 #reader(lib "htdp-intermediate-reader.ss" "lang")((modname sudoku-listing) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
 (require racket/list) ;gets list-ref, take and drop
         
-;; sudoku-v3.rkt
+;; sudoku-v4.rkt
 
 ;;
 ;; Brute force Sudoku solver
@@ -204,7 +204,7 @@
 
 ;; Board -> Board or false
 ;; produce a solution for bd; or false if bd is unsolvable
-;; Assume: bd is valid
+;; Assume: bd is valid  
 (check-expect (solve BD4) BD4s)
 (check-expect (solve BD5) BD5s)
 (check-expect (solve BD7) false)
@@ -230,7 +230,7 @@
 ;; Board -> Boolean
 ;; produce true if board is solved
 ;; Assume: board is valid, so it is solved if it is full
-(check-expect (solved? BD1) false)
+(check-expect (solved? BD1) false) 
 (check-expect (solved? BD2) false)
 (check-expect (solved? BD4s) true)
  
@@ -266,14 +266,15 @@
 (check-expect (find-blank BD1) 0)
 (check-expect (find-blank (cons 2 (rest BD1))) 1)
 (check-expect (find-blank (cons 2 (cons 4 (rest (rest BD1))))) 2)
-; (define (find-blank bd) 0) ;stub
+
+;(define (find-blank bd) 0) ;stub
 
 (define (find-blank bd)
   (cond [(empty? bd) (error "The board didn't have a blank space.")]
         [else
          (if (false? (first bd))
              0
-             (+ 1 (find-blank (rest bd))))]))
+             (+ 1 (find-blank (rest bd))))]))  
 
 ;; Pos Board -> (listof Board)
 ;; produce 9 boards, with blank filled with Natural[1, 9]
@@ -286,23 +287,28 @@
                     (cons 6 (rest BD1))
                     (cons 7 (rest BD1))
                     (cons 8 (rest BD1))
-                    (cons 9 (rest BD1))))
-; (define (fill-with-1-9 p bd) empty) ;stub
+                    (cons 9 (rest BD1)))) 
+
+;(define (fill-with-1-9 p bd) empty) ;stub
+
 (define (fill-with-1-9 p bd)
   (local [(define (build-one n)
-            (fill-square bd p (+ n 1)))]
-    (build-list 9 build-one)))
+            (fill-square bd p (+ n 1)))]            
+    (build-list 9 build-one))) 
+
 
 ;; (listof Board) -> (listof Board)
 ;; produce list containing only valid boards
-(check-expect (keep-only-valid (list (cons 1 (cons 1 (rest (rest BD1)))))) empty)
-; (define (keep-only-valid lobd) empty) ;stub
+(check-expect (keep-only-valid (list (cons 1 (cons 1 (rest (rest BD1))))))
+              empty)
+
+;(define (keep-only-valid lobd) empty) ;stub
 
 (define (keep-only-valid lobd)
-  (filter valid-board? lobd))
+  (filter valid-board? lobd)) 
 
-;; Board -> Bolean
-;; produce true if board is valid, false otherwise
+;; Board -> Boolean
+;; produce true if no unit on the board has the same value twice; false otherwise
 (check-expect (valid-board? BD1) true)
 (check-expect (valid-board? BD2) true)
 (check-expect (valid-board? BD3) true)
@@ -311,7 +317,31 @@
 (check-expect (valid-board? (cons 2 (rest BD2))) false)
 (check-expect (valid-board? (cons 2 (rest BD3))) false)
 (check-expect (valid-board? (fill-square BD4 1 6)) false)
-(define (valid-board? bd) false) ; stub
+
+; (define (valid-board? bd) false) ; stub
+
+(define (valid-board? bd)
+  (local[(define (valid-units? lou)                             ; (listof Unit) -> Boolena
+           (andmap valid-unit? lou))
+         (define (valid-unit? u)                                ; Unit -> Boolena
+           (no-duplicates?
+            (keep-only-values
+             (read-unit u))))
+         (define (read-unit u)                                  ; Unit -> (listof Val|false)
+           (map read-pos u))
+
+         (define (read-pos p)                                   ; Pos -> Val|false
+           (read-square bd p))
+         (define (keep-only-values lovf)                        ; (listof Val|false) -> (listof Val)
+           (filter number? lovf))
+         (define (no-duplicates? lov)                           ; (listof Val) -> Boolean
+           (cond
+             [(empty? lov) true]
+             [else
+              (if (member (first lov) (rest lov))
+                  false
+                  (no-duplicates? (rest lov)))]))]      
+    (valid-units? UNITS)))
 
 
 ;; Board Pos -> Val or false
